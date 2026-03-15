@@ -7,6 +7,7 @@ CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
 REFRESH_TOKEN = os.environ["GOOGLE_REFRESH_TOKEN"]
 SENDERS_FILTER = os.environ.get("GMAIL_SENDERS_FILTER", "")  # למשל: "submissions@formsubmit.co,other@example.com"
+KEYWORDS_FILTER = os.environ.get("GMAIL_KEYWORDS_FILTER", "")  # למשל: "חשבונית,תשלום התקבל,דוח חודשי"
 
 
 def get_service():
@@ -21,11 +22,23 @@ def get_service():
 
 
 def build_query():
-    if not SENDERS_FILTER:
+    conditions = []
+
+    if SENDERS_FILTER:
+        senders = [s.strip() for s in SENDERS_FILTER.split(",") if s.strip()]
+        from_query = " OR ".join([f"from:{s}" for s in senders])
+        conditions.append(f"({from_query})")
+
+    if KEYWORDS_FILTER:
+        keywords = [k.strip() for k in KEYWORDS_FILTER.split(",") if k.strip()]
+        # עוטפים בגרשיים כדי לתמוך בצמדי מילים
+        kw_query = " OR ".join([f'"{k}"' for k in keywords])
+        conditions.append(f"({kw_query})")
+
+    if not conditions:
         return "is:unread"
-    senders = [s.strip() for s in SENDERS_FILTER.split(",") if s.strip()]
-    from_query = " OR ".join([f"from:{s}" for s in senders])
-    return f"is:unread ({from_query})"
+
+    return f"is:unread ({' OR '.join(conditions)})"
 
 
 def get_new_emails():
