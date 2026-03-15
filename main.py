@@ -1,5 +1,7 @@
 import time
+import threading
 import logging
+from flask import Flask
 from gmail_client import get_new_emails
 from telegram_client import send_notification
 from db import is_seen, mark_seen
@@ -8,8 +10,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 POLL_INTERVAL = 120  # שניות
 
+app = Flask(__name__)
 
-def run():
+
+@app.route("/")
+def health():
+    return "Gmail Bot is running", 200
+
+
+def polling_loop():
     logging.info("Gmail Bot started")
     while True:
         try:
@@ -25,4 +34,6 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    thread = threading.Thread(target=polling_loop, daemon=True)
+    thread.start()
+    app.run(host="0.0.0.0", port=10000)
