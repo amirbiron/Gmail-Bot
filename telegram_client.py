@@ -2,7 +2,6 @@ import os
 import re
 import html
 import requests
-from datetime import datetime
 from email.utils import parsedate_to_datetime
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -18,6 +17,9 @@ FIELD_NAMES = {
 
 DAYS_HE = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
 
+# סדר המפתחות חשוב — משתמשים בהם כעוגנים לפירסור
+KNOWN_KEYS = list(FIELD_NAMES.keys())
+
 
 def format_date(date_str):
     try:
@@ -29,26 +31,38 @@ def format_date(date_str):
 
 
 def parse_formsubmit(snippet):
-    """מפרסר את תוכן מייל FormSubmit לשדות מסודרים."""
     clean = html.unescape(snippet)
-    # חיתוך הכותרת של FormSubmit
+
+    # חיתוך הכותרת
     match = re.search(r"Here.s what they had to say[:\s]*(.*)", clean, re.DOTALL | re.IGNORECASE)
     if not match:
         return None
     body = match.group(1).strip()
-    # פירסור שדות — פורמט: "key value key value..."
-    pairs = re.findall(r"(\w+)\s+([^\n\t]+?)(?=\s+\w+\s+|$)", body)
-    if not pairs:
+
+    # מחיקת שורת הכותרת "Name Value" אם קיימת
+    body = re.sub(r"^Name\s+Value\s*", "", body, flags=re.IGNORECASE).strip()
+
+    # בניית regex דינמי לפי המפתחות הידועים
+    # כל מפתח הוא עוגן — הערך שלו הוא הכל עד המפתח הבא
+    keys_pattern = "|".join(KNOWN_KEYS)
+    pattern = re.compile(
+        rf"({keys_pattern})\s+(.*?)(?=\s+(?:{keys_pattern})\s|$)",
+        re.IGNORECASE | re.DOTALL
+    )
+
+    matches = pattern.findall(body)
+    if not matches:
         return None
+
     lines = []
-    for key, value in pairs:
+    for key, value in matches:
         value = value.strip()
         label = FIELD_NAMES.get(key.lower(), key)
         if value:
             lines.append(f"*{label}:* {value}")
-        # שדות ריקים — משאירים (לפי הבקשה)
         else:
             lines.append(f"*{label}:*")
+
     return "\n".join(lines)
 
 
