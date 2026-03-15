@@ -8,6 +8,7 @@ CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
 REFRESH_TOKEN = os.environ["GOOGLE_REFRESH_TOKEN"]
 SENDERS_FILTER = os.environ.get("GMAIL_SENDERS_FILTER", "")  # למשל: "submissions@formsubmit.co,other@example.com"
 KEYWORDS_FILTER = os.environ.get("GMAIL_KEYWORDS_FILTER", "")  # למשל: "חשבונית,תשלום התקבל,דוח חודשי"
+EXTRA_FILTER = os.environ.get("GMAIL_EXTRA_FILTER", "")  # למשל: "-category:promotions -category:social -category:updates -category:forums"
 
 
 def get_service():
@@ -35,10 +36,12 @@ def build_query():
         kw_query = " OR ".join([f'"{k}"' for k in keywords])
         conditions.append(f"({kw_query})")
 
-    if not conditions:
-        return "is:unread"
+    extra = f" {EXTRA_FILTER}" if EXTRA_FILTER else ""
 
-    return f"is:unread ({' OR '.join(conditions)})"
+    if not conditions:
+        return f"is:unread{extra}"
+
+    return f"is:unread ({' OR '.join(conditions)}){extra}"
 
 
 def get_new_emails():
