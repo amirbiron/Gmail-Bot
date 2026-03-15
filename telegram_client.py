@@ -69,11 +69,13 @@ def parse_formsubmit(snippet):
 def format_formsubmit(email):
     fields = parse_formsubmit(email["snippet"])
     date_str = format_date(email["date"])
+    link = f"https://mail.google.com/mail/u/0/#inbox/{email['id']}"
     header = (
         f"📧 *מייל חדש*\n\n"
         f"👤 *מאת:* `{email['from']}`\n"
         f"📌 *נושא:* {email['subject']}\n"
-        f"🕐 *תאריך:* {date_str}\n\n"
+        f"🕐 *תאריך:* {date_str}\n"
+        f"🔗 [פתח ב-Gmail]({link})\n\n"
     )
     if fields:
         return header + "*פרטי הטופס:*\n" + fields
@@ -82,11 +84,13 @@ def format_formsubmit(email):
 
 def format_default(email):
     date_str = format_date(email["date"])
+    link = f"https://mail.google.com/mail/u/0/#inbox/{email['id']}"
     return (
         f"📧 *מייל חדש*\n\n"
         f"👤 *מאת:* `{email['from']}`\n"
         f"📌 *נושא:* {email['subject']}\n"
-        f"🕐 *תאריך:* {date_str}\n\n"
+        f"🕐 *תאריך:* {date_str}\n"
+        f"🔗 [פתח ב-Gmail]({link})\n\n"
         f"_{html.unescape(email['snippet'])}_"
     )
 
