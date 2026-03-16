@@ -44,19 +44,26 @@ def build_query():
     return f"is:unread ({' OR '.join(conditions)}){extra}"
 
 
-def extract_body(payload):
-    """שליפת גוף המייל (HTML מועדף, אחרת טקסט) מתוך payload של Gmail API."""
+def _collect_parts(payload):
+    """אסוף את כל ה-parts באופן רקורסיבי (multipart מקונן)."""
+    parts = []
     body_data = payload.get("body", {}).get("data")
     if body_data:
-        return base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace")
+        parts.append(payload)
+    for child in payload.get("parts", []):
+        parts.extend(_collect_parts(child))
+    return parts
 
-    parts = payload.get("parts", [])
+
+def extract_body(payload):
+    """שליפת גוף המייל (HTML מועדף, אחרת טקסט) מתוך payload של Gmail API."""
+    all_parts = _collect_parts(payload)
     for mime in ("text/html", "text/plain"):
-        for part in parts:
+        for part in all_parts:
             if part.get("mimeType", "") == mime:
-                part_data = part.get("body", {}).get("data")
-                if part_data:
-                    return base64.urlsafe_b64decode(part_data).decode("utf-8", errors="replace")
+                data = part.get("body", {}).get("data")
+                if data:
+                    return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
     return ""
 
 
