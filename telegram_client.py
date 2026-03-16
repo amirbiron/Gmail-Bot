@@ -30,20 +30,44 @@ def format_date(date_str):
         return date_str
 
 
-def parse_formsubmit(snippet):
+def parse_formsubmit_html(body_html):
+    """פירסור טבלת HTML של FormSubmit — אמין יותר מפירסור snippet."""
+    if not body_html:
+        return None
+
+    rows = re.findall(
+        r"<tr[^>]*>\s*<td[^>]*>(.*?)</td>\s*<td[^>]*>(.*?)</td>\s*</tr>",
+        body_html, re.IGNORECASE | re.DOTALL,
+    )
+    if not rows:
+        return None
+
+    lines = []
+    for raw_key, raw_value in rows:
+        key = html.unescape(re.sub(r"<[^>]+>", "", raw_key)).strip().lower()
+        label = FIELD_NAMES.get(key)
+        if label is None:
+            continue
+        value = html.unescape(re.sub(r"<[^>]+>", "", raw_value)).strip()
+        if value:
+            lines.append(f"*{label}:* {value}")
+        else:
+            lines.append(f"*{label}:*")
+
+    return "\n".join(lines) if lines else None
+
+
+def parse_formsubmit_snippet(snippet):
+    """פירסור snippet — fallback למקרה שאין body."""
     clean = html.unescape(snippet)
 
-    # חיתוך הכותרת
     match = re.search(r"Here.s what they had to say[:\s]*(.*)", clean, re.DOTALL | re.IGNORECASE)
     if not match:
         return None
     body = match.group(1).strip()
 
-    # מחיקת שורת הכותרת "Name Value" אם קיימת
     body = re.sub(r"^Name\s+Value\s*", "", body, flags=re.IGNORECASE).strip()
 
-    # בניית regex דינמי לפי המפתחות הידועים
-    # כל מפתח הוא עוגן — הערך שלו הוא הכל עד המפתח הבא
     keys_pattern = "|".join(KNOWN_KEYS)
     pattern = re.compile(
         rf"({keys_pattern})\s+(.*?)(?=\s+(?:{keys_pattern})\s|$)",
@@ -67,7 +91,7 @@ def parse_formsubmit(snippet):
 
 
 def format_formsubmit(email):
-    fields = parse_formsubmit(email["snippet"])
+    fields = parse_formsubmit_html(email.get("body", "")) or parse_formsubmit_snippet(email["snippet"])
     date_str = format_date(email["date"])
     link = f"https://mail.google.com/mail/u/0/#inbox/{email['id']}"
     header = (
