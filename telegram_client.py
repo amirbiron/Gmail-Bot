@@ -45,12 +45,15 @@ def parse_formsubmit_html(body_html):
     lines = []
     for raw_key, raw_value in rows:
         key = html.unescape(re.sub(r"<[^>]+>", "", raw_key)).strip().lower()
+        value_text = html.unescape(re.sub(r"<[^>]+>", "", raw_value)).strip()
+        # דילוג על שורת הכותרת "Name | Value"
+        if key == "name" and value_text.lower() == "value":
+            continue
         label = FIELD_NAMES.get(key)
         if label is None:
             continue
-        value = html.unescape(re.sub(r"<[^>]+>", "", raw_value)).strip()
-        if value:
-            lines.append(f"*{label}:* {value}")
+        if value_text:
+            lines.append(f"*{label}:* {value_text}")
         else:
             lines.append(f"*{label}:*")
 
