@@ -5,7 +5,24 @@ import requests
 from email.utils import parsedate_to_datetime
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_IDS = [cid.strip() for cid in os.environ["TELEGRAM_CHAT_ID"].split(",")]
+def _parse_chat_ids(raw):
+    """פירסור TELEGRAM_CHAT_ID — תומך בפילטר לפי פרויקט.
+
+    פורמט: "ID1,ID2:project,ID3:project"
+    ID ללא פילטר מקבל את כל המיילים.
+    """
+    entries = []
+    for part in raw.split(","):
+        part = part.strip()
+        if ":" in part:
+            chat_id, project_filter = part.split(":", 1)
+            entries.append((chat_id.strip(), project_filter.strip().lower()))
+        else:
+            entries.append((part, None))
+    return entries
+
+
+CHAT_ENTRIES = _parse_chat_ids(os.environ["TELEGRAM_CHAT_ID"])
 
 FIELD_NAMES = {
     "name": "שם",
@@ -154,7 +171,9 @@ def send_notification(email):
         text = format_default(email, project)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for chat_id in CHAT_IDS:
+    for chat_id, project_filter in CHAT_ENTRIES:
+        if project_filter and project_filter != project:
+            continue
         payload = {
             "chat_id": chat_id,
             "text": text,
