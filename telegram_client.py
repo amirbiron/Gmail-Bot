@@ -5,7 +5,7 @@ import requests
 from email.utils import parsedate_to_datetime
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+CHAT_IDS = [cid.strip() for cid in os.environ["TELEGRAM_CHAT_ID"].split(",")]
 
 FIELD_NAMES = {
     "name": "שם",
@@ -154,10 +154,11 @@ def send_notification(email):
         text = format_default(email, project)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": text,
-        "parse_mode": "Markdown",
-    }
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
+    for chat_id in CHAT_IDS:
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+        }
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
