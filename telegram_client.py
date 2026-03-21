@@ -1,6 +1,7 @@
 import os
 import re
 import html
+import logging
 import requests
 from email.utils import parsedate_to_datetime
 
@@ -171,6 +172,7 @@ def send_notification(email):
         text = format_default(email, project)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    errors = []
     for chat_id, project_filter in CHAT_ENTRIES:
         if project_filter and project_filter != project:
             continue
@@ -179,5 +181,11 @@ def send_notification(email):
             "text": text,
             "parse_mode": "Markdown",
         }
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+        except Exception as e:
+            logging.error(f"Failed to send to chat {chat_id}: {e}")
+            errors.append(e)
+    if errors:
+        raise errors[0]
