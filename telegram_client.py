@@ -110,7 +110,7 @@ def parse_formsubmit_snippet(snippet):
 
 def _header_title(project):
     if project == "shipment-bot":
-        return f"🚚 *מייל חדש — {project}*"
+        return f"📧 *מייל חדש — {project}* 🚚"
     if project:
         return f"📧 *מייל חדש — {project}*"
     return "📧 *מייל חדש*"
