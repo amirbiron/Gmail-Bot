@@ -17,6 +17,21 @@ FIELD_NAMES = {
 
 DAYS_HE = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
 
+SENTRY_PROJECTS = ["codekeeper", "shipment-bot"]
+
+
+def detect_sentry_project(email):
+    """זיהוי שם פרויקט Sentry מתוך תוכן המייל."""
+    searchable = " ".join([
+        email.get("subject", ""),
+        email.get("snippet", ""),
+        email.get("body", ""),
+    ]).lower()
+    for project in SENTRY_PROJECTS:
+        if project in searchable:
+            return project
+    return None
+
 # סדר המפתחות חשוב — משתמשים בהם כעוגנים לפירסור
 KNOWN_KEYS = list(FIELD_NAMES.keys())
 
@@ -93,12 +108,18 @@ def parse_formsubmit_snippet(snippet):
     return "\n".join(lines)
 
 
-def format_formsubmit(email):
+def _header_title(project):
+    if project:
+        return f"📧 *מייל חדש — {project}*"
+    return "📧 *מייל חדש*"
+
+
+def format_formsubmit(email, project=None):
     fields = parse_formsubmit_html(email.get("body", "")) or parse_formsubmit_snippet(email["snippet"])
     date_str = format_date(email["date"])
     link = f"https://mail.google.com/mail/u/0/#inbox/{email['id']}"
     header = (
-        f"📧 *מייל חדש*\n\n"
+        f"{_header_title(project)}\n\n"
         f"👤 *מאת:* `{email['from']}`\n"
         f"📌 *נושא:* {email['subject']}\n"
         f"🕐 *תאריך:* {date_str}\n"
@@ -109,11 +130,11 @@ def format_formsubmit(email):
     return header + f"_{html.unescape(email['snippet'])}_"
 
 
-def format_default(email):
+def format_default(email, project=None):
     date_str = format_date(email["date"])
     link = f"https://mail.google.com/mail/u/0/#inbox/{email['id']}"
     return (
-        f"📧 *מייל חדש*\n\n"
+        f"{_header_title(project)}\n\n"
         f"👤 *מאת:* `{email['from']}`\n"
         f"📌 *נושא:* {email['subject']}\n"
         f"🕐 *תאריך:* {date_str}\n"
@@ -124,10 +145,11 @@ def format_default(email):
 
 def send_notification(email):
     sender = email["from"].lower()
+    project = detect_sentry_project(email)
     if "formsubmit" in sender:
-        text = format_formsubmit(email)
+        text = format_formsubmit(email, project)
     else:
-        text = format_default(email)
+        text = format_default(email, project)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
