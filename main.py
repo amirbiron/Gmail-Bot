@@ -32,7 +32,11 @@ def polling_loop():
             logging.error(f"Error in polling loop: {e}")
             if "invalid_grant" in str(e).lower():
                 logging.error("Refresh token expired — sending guide to Telegram")
-                send_refresh_token_guide()
+                try:
+                    send_refresh_token_guide()
+                    logging.info("Refresh token guide sent successfully")
+                except Exception as guide_err:
+                    logging.error(f"Failed to send refresh token guide: {guide_err}")
                 return  # עצירת הלופ — אין טעם להמשיך בלי טוקן תקין
         time.sleep(POLL_INTERVAL)
 
