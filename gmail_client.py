@@ -21,7 +21,6 @@ def get_service():
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         token_uri="https://oauth2.googleapis.com/token",
-        scopes=SCOPES,
     )
     return build("gmail", "v1", credentials=creds)
 
