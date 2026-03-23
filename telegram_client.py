@@ -145,6 +145,39 @@ def format_default(email, project=None):
     )
 
 
+def send_refresh_token_guide():
+    """שולח לטלגרם הוראות ליצירת refresh token חדש."""
+    text = (
+        "⚠️ *שגיאת אימות Gmail — נדרש Refresh Token חדש*\n\n"
+        "ה-Refresh Token פג תוקף או בוטל\\. הבוט לא יכול לגשת ל-Gmail\\.\n\n"
+        "*שלב 1 — Google Cloud Console*\n"
+        "1\\. נכנסים ל-Google Cloud Console\n"
+        "2\\. APIs & Services → Credentials\n"
+        "3\\. מוצאים את ה-OAuth 2\\.0 Client ומעתיקים Client ID ו-Client Secret\n\n"
+        "*שלב 2 — יצירת Refresh Token*\n"
+        "1\\. נכנסים ל-OAuth 2\\.0 Playground:\n"
+        "`https://developers.google.com/oauthplayground/`\n"
+        "2\\. לוחצים על ⚙️ \\(הגדרות\\) למעלה מימין\n"
+        "3\\. מסמנים *Use your own OAuth credentials*\n"
+        "4\\. מכניסים את ה-Client ID וה-Client Secret\n"
+        "5\\. בצד שמאל בוחרים:\n"
+        "`Gmail API v1 → https://www.googleapis.com/auth/gmail.readonly`\n"
+        "6\\. לוחצים *Authorize APIs* → נכנסים עם חשבון הג׳ימייל\n"
+        "7\\. לוחצים *Exchange authorization code for tokens*\n"
+        "8\\. מעתיקים את ה-`refresh_token` מהתגובה\n\n"
+        "*שלב 3 — עדכון*\n"
+        "מעדכנים את משתנה הסביבה `GOOGLE_REFRESH_TOKEN` בערך החדש "
+        "ומפעילים מחדש את הבוט\\."
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": text,
+        "parse_mode": "MarkdownV2",
+    }
+    requests.post(url, json=payload)
+
+
 def send_notification(email):
     sender = email["from"].lower()
     project = detect_sentry_project(email)
