@@ -11,6 +11,9 @@ KEYWORDS_FILTER = os.environ.get("GMAIL_KEYWORDS_FILTER", "")  # למשל: "חש
 EXTRA_FILTER = os.environ.get("GMAIL_EXTRA_FILTER", "")  # למשל: "-category:promotions -category:social -category:updates -category:forums"
 
 
+SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+
 def get_service():
     creds = Credentials(
         token=None,
@@ -18,6 +21,7 @@ def get_service():
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         token_uri="https://oauth2.googleapis.com/token",
+        scopes=SCOPES,
     )
     return build("gmail", "v1", credentials=creds)
 
