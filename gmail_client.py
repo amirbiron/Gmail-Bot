@@ -1,4 +1,5 @@
 import os
+import logging
 import base64
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -9,7 +10,7 @@ REFRESH_TOKEN = os.environ["GOOGLE_REFRESH_TOKEN"]
 SENDERS_FILTER = os.environ.get("GMAIL_SENDERS_FILTER", "")  # למשל: "submissions@formsubmit.co,other@example.com"
 KEYWORDS_FILTER = os.environ.get("GMAIL_KEYWORDS_FILTER", "")  # למשל: "חשבונית,תשלום התקבל,דוח חודשי"
 EXTRA_FILTER = os.environ.get("GMAIL_EXTRA_FILTER", "")  # למשל: "-category:promotions -category:social -category:updates -category:forums"
-
+PUBSUB_TOPIC = os.environ.get("GOOGLE_PUBSUB_TOPIC", "")  # למשל: "projects/my-project/topics/gmail-notifications"
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
@@ -70,7 +71,22 @@ def extract_body(payload):
     return ""
 
 
+def _parse_message(service, msg_id):
+    """שליפת פרטי הודעה לפי ID."""
+    data = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
+    headers = {h["name"]: h["value"] for h in data["payload"]["headers"]}
+    return {
+        "id": msg_id,
+        "from": headers.get("From", "Unknown"),
+        "subject": headers.get("Subject", "(ללא נושא)"),
+        "date": headers.get("Date", ""),
+        "snippet": data.get("snippet", ""),
+        "body": extract_body(data["payload"]),
+    }
+
+
 def get_new_emails():
+    """Polling fallback — שואב מיילים שלא נקראו לפי הפילטרים."""
     service = get_service()
     query = build_query()
     result = service.users().messages().list(userId="me", q=query, maxResults=10).execute()
@@ -78,15 +94,71 @@ def get_new_emails():
 
     emails = []
     for msg in messages:
-        data = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
-        headers = {h["name"]: h["value"] for h in data["payload"]["headers"]}
-        emails.append({
-            "id": msg["id"],
-            "from": headers.get("From", "Unknown"),
-            "subject": headers.get("Subject", "(ללא נושא)"),
-            "date": headers.get("Date", ""),
-            "snippet": data.get("snippet", ""),
-            "body": extract_body(data["payload"]),
-        })
+        emails.append(_parse_message(service, msg["id"]))
 
     return emails
+
+
+# --- Pub/Sub webhook support ---
+
+
+def start_watch():
+    """רישום ל-Gmail Push Notifications דרך Pub/Sub.
+
+    מחזיר dict עם historyId ו-expiration, או None אם לא מוגדר topic.
+    יש לחדש כל 7 ימים.
+    """
+    if not PUBSUB_TOPIC:
+        logging.warning("GOOGLE_PUBSUB_TOPIC not set — webhook mode disabled")
+        return None
+
+    service = get_service()
+    body = {
+        "topicName": PUBSUB_TOPIC,
+        "labelIds": ["INBOX"],
+    }
+    result = service.users().watch(userId="me", body=body).execute()
+    logging.info(f"Gmail watch registered, historyId={result.get('historyId')}, "
+                 f"expiration={result.get('expiration')}")
+    return result
+
+
+def get_emails_since(history_id):
+    """שליפת הודעות חדשות מאז historyId מסוים באמצעות History API.
+
+    מחזיר (emails, new_history_id).
+    """
+    service = get_service()
+
+    try:
+        response = service.users().history().list(
+            userId="me",
+            startHistoryId=history_id,
+            historyTypes=["messageAdded"],
+            labelId="INBOX",
+        ).execute()
+    except Exception as e:
+        if "404" in str(e) or "notFound" in str(e).lower():
+            logging.warning(f"historyId {history_id} expired, falling back to full poll")
+            return None, None
+        raise
+
+    new_history_id = response.get("historyId", history_id)
+    history = response.get("history", [])
+
+    msg_ids = set()
+    for record in history:
+        for added in record.get("messagesAdded", []):
+            msg = added.get("message", {})
+            labels = msg.get("labelIds", [])
+            if "INBOX" in labels:
+                msg_ids.add(msg["id"])
+
+    emails = []
+    for msg_id in msg_ids:
+        try:
+            emails.append(_parse_message(service, msg_id))
+        except Exception as e:
+            logging.error(f"Failed to fetch message {msg_id}: {e}")
+
+    return emails, new_history_id

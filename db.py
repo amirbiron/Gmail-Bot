@@ -22,3 +22,23 @@ def mark_seen(message_id: str):
         "message_id": message_id,
         "created_at": datetime.now(timezone.utc),
     })
+
+
+# --- History ID tracking for Pub/Sub webhook ---
+
+state_collection = db["bot_state"]
+
+
+def get_history_id():
+    """מחזיר את ה-historyId האחרון ששמרנו, או None."""
+    doc = state_collection.find_one({"_id": "history_id"})
+    return doc["value"] if doc else None
+
+
+def set_history_id(history_id: str):
+    """שומר את ה-historyId האחרון."""
+    state_collection.update_one(
+        {"_id": "history_id"},
+        {"$set": {"value": history_id}},
+        upsert=True,
+    )
